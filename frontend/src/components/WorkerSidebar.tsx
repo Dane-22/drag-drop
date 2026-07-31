@@ -300,7 +300,11 @@ export const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
 
   const filteredWorkers = workers.filter((w) => {
     const allocInfo = getWorkerAllocationInfo(w.id);
-    const currentComputedStatus = allocInfo.isFullyAssigned ? 'Assigned' : 'Available';
+    
+    // Remove worker's card if the status is assigned
+    if (allocInfo.isFullyAssigned) return false;
+
+    const currentComputedStatus = 'Available';
 
     const matchesSearch =
       w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

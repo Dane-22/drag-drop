@@ -89,13 +89,16 @@ const DraggableAllocatedCard: React.FC<{
         e.stopPropagation();
         if (onSelect) onSelect();
       }}
-      className={`group/card p-1.5 rounded-xl border transition-all flex items-center justify-between gap-1 select-none cursor-grab active:cursor-grabbing relative ${isDragging
-          ? 'ring-4 ring-brandOrange-500 shadow-2xl opacity-90 scale-105 border-brandOrange-500 bg-white z-50'
-          : isSelected
-            ? 'ring-2 ring-brandOrange-500 shadow-lg shadow-brandOrange-500/20 bg-amber-50/90 border-brandOrange-400 border-l-4 border-l-brandOrange-600 scale-[1.02]'
-            : otherUserDragging
-              ? 'ring-2 ring-amber-500 bg-amber-50/90 border-amber-300 shadow-md'
-              : 'bg-white hover:bg-slate-50 border-slate-200 border-l-4 border-l-brandOrange-500 hover:shadow-md'
+      className={`group/card p-1 rounded-lg border transition-all flex items-center justify-between gap-1 select-none cursor-grab active:cursor-grabbing relative ${
+        isDragging
+          ? 'ring-4 ring-brandOrange-500 shadow-2xl opacity-90 scale-105 border-brandOrange-500 bg-white z-[100]'
+          : isKebabOpen
+            ? 'z-[90] ring-2 ring-slate-300 bg-white shadow-md scale-[1.02]'
+            : isSelected
+              ? 'z-20 ring-2 ring-brandOrange-500 shadow-lg shadow-brandOrange-500/20 bg-amber-50/90 border-brandOrange-400 border-l-4 border-l-brandOrange-600 scale-[1.02]'
+              : otherUserDragging
+                ? 'z-10 ring-2 ring-amber-500 bg-amber-50/90 border-amber-300 shadow-md'
+                : 'z-10 bg-white hover:bg-slate-50 border-slate-200 border-l-4 border-l-brandOrange-500 hover:shadow-md'
         }`}
     >
       {/* Remove Button */}
@@ -118,10 +121,10 @@ const DraggableAllocatedCard: React.FC<{
             'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=120&q=80'
           }
           alt={alloc.worker_name || 'Worker'}
-          className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200"
+          className="w-6 h-6 rounded-full object-cover shrink-0 border border-slate-200"
         />
         <div className="truncate">
-          <h5 className="text-[11px] font-black text-slate-900 truncate leading-tight">
+          <h5 className="text-[10px] font-black text-slate-900 truncate leading-tight">
             {alloc.worker_name || `Worker #${alloc.worker_id}`}
           </h5>
           {otherUserDragging ? (
@@ -130,12 +133,12 @@ const DraggableAllocatedCard: React.FC<{
             </span>
           ) : (
             <div className="flex flex-col mt-0.5">
-              <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium truncate">
+              <div className="flex items-center gap-1 text-[9px] text-slate-500 font-medium truncate">
                 {getTradeIcon(alloc.worker_trade || '')}
                 <span className="truncate">{alloc.worker_trade || 'Trade'}</span>
               </div>
               {alloc.assigned_by && (
-                <div className="text-[9px] text-slate-400 font-medium truncate mt-0.5">
+                <div className="text-[8px] text-slate-400 font-medium truncate mt-0.5">
                   ↳ by {alloc.assigned_by}
                 </div>
               )}
@@ -213,7 +216,7 @@ const MatrixCell: React.FC<{
   return (
     <td
       ref={setNodeRef}
-      className={`p-2 border border-slate-200/80 align-top transition-all min-h-[90px] h-[90px] ${isOver
+      className={`p-1 border border-slate-200/80 align-top transition-all min-h-[60px] h-full ${isOver
           ? 'bg-emerald-500/15 border-emerald-500 border-2 border-dashed shadow-lg shadow-emerald-500/20'
           : 'hover:bg-slate-50/50'
         }`}
@@ -368,15 +371,24 @@ export const SiteAllocationGrid: React.FC<SiteAllocationGridProps> = ({
               {viewMode === 'week' && visibleDays.map((day) => {
                 const dayIdx = DAYS.indexOf(day);
                 const dateInfo = getDayDateInfo(selectedWeekStart, dayIdx);
+                
+                // Calculate total workers for this day
+                const dayTotal = filteredAllocations.filter((a) => {
+                  const cleanDate = a.allocation_date?.substring(0, 10);
+                  return cleanDate === dateInfo.isoDate;
+                }).length;
 
                 return (
                   <th
                     key={day}
-                    className="p-3 text-center border-b border-r border-[#21385c] font-extrabold text-[10px] tracking-wider text-slate-200 min-w-[160px]"
+                    className="p-1.5 text-center border-b border-r border-[#21385c] font-extrabold text-[10px] tracking-wider text-slate-200 min-w-[110px]"
                   >
                     <div className="flex flex-col items-center leading-tight">
                       <span className="uppercase text-slate-100">{day}</span>
                       <span className="text-[10px] text-brandOrange-400 font-bold mt-0.5">({dateInfo.label})</span>
+                      <div className="mt-1 bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[9px]">
+                        Total Workers: {dayTotal}
+                      </div>
                     </div>
                   </th>
                 );
