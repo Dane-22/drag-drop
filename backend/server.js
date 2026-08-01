@@ -186,6 +186,37 @@ app.post('/api/users/create', mutationLimiter, (req, res) => {
 });
 
 // ----------------------------------------------------------------------
+// 0. GET /api/allocations/verify - Integration endpoint for Attendance System
+// ----------------------------------------------------------------------
+app.get('/api/allocations/verify', async (req, res) => {
+  const { employeeId, branchCode, date } = req.query;
+
+  if (!employeeId || !branchCode || !date) {
+    return res.status(400).json({ success: false, message: 'Invalid parameters' });
+  }
+
+  try {
+    const workerId = parseInt(employeeId, 10);
+    
+    const [allocRows] = await pool.query(`
+      SELECT a.id 
+      FROM allocations a
+      JOIN projects p ON a.project_id = p.id
+      WHERE a.worker_id = ? AND (p.name LIKE CONCAT('%', ?, '%') OR p.site_number = ?) AND a.allocation_date = ?
+    `, [workerId, branchCode, branchCode, date]);
+
+    if (allocRows.length > 0) {
+      return res.json({ success: true, allocated: true });
+    } else {
+      return res.json({ success: true, allocated: false });
+    }
+  } catch (err) {
+    console.error('Error verifying allocation:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ----------------------------------------------------------------------
 // 1. GET /api/get_data - Read workers, projects, and matrix allocations
 // ----------------------------------------------------------------------
 app.get('/api/get_data', async (req, res) => {

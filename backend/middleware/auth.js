@@ -12,6 +12,12 @@ export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
+  // Service-to-service authentication
+  if (token && process.env.SERVICE_API_KEY && token === process.env.SERVICE_API_KEY) {
+    req.user = { id: 0, name: 'Service', role: 'service' };
+    return next();
+  }
+
   // For development & seamless backwards compatibility, if no token header is provided, attach default dispatcher session
   if (!token) {
     req.user = { id: 1, name: 'Dispatcher Admin', role: 'admin' };
