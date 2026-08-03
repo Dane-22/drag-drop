@@ -7,15 +7,14 @@ import { Server } from 'socket.io';
 import { pool, initDatabase } from './db.js';
 import { authenticateToken, generateToken } from './middleware/auth.js';
 import { authLimiter, mutationLimiter, globalLimiter } from './middleware/rateLimiter.js';
-import {
-  validate,
-  allocateWorkerSchema,
-  removeAllocationSchema,
-  createProjectSchema,
-  createWorkerSchema
-} from './middleware/validation.js';
+import { validate, allocateWorkerSchema, removeAllocationSchema, createProjectSchema, createWorkerSchema } from './middleware/validation.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const httpServer = createServer(app);
