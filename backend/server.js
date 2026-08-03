@@ -350,7 +350,8 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
     // Fire-and-forget sync function
     const syncToAttendance = () => {
       if (branchCode) {
-        fetch('http://localhost:5000/api/webhooks/drag-and-drop-sync', {
+        const attendanceApiUrl = process.env.V2_ATTENDANCE_API_URL || 'http://localhost:5000';
+        fetch(`${attendanceApiUrl}/api/webhooks/drag-and-drop-sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -33,6 +33,15 @@ import type { AuthUser, NavPageId } from '../types/auth';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
+const getTodayString = () => new Date().toISOString().split('T')[0];
+const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
+const getStartOfWeek = (d: Date) => {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(date.setDate(diff)).toISOString().split('T')[0];
+};
+
 export const App: React.FC = () => {
   // Authentication & Role State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -51,9 +60,9 @@ export const App: React.FC = () => {
 
   // Time Granularity View Mode States (Day, Week, Month)
   const [viewMode, setViewMode] = useState<AllocationViewMode>('week');
-  const [selectedDate, setSelectedDate] = useState<string>('2026-07-27');
-  const [selectedWeekStart, setSelectedWeekStart] = useState<string>('2026-07-27');
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026-07');
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
+  const [selectedWeekStart, setSelectedWeekStart] = useState<string>(getStartOfWeek(new Date()));
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [selectedAllocId, setSelectedAllocId] = useState<number | null>(null);
 
   // Live Drag Ghosting Presence State

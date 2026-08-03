@@ -45,10 +45,10 @@ If the update includes new database tables or columns:
 **SQL Import (since Drag&Drop uses raw MySQL queries):**
 ```bash
 # Import the SQL file (replace file.sql with the actual filename)
-mysql -u root -p attendance-system < /path/to/your/file.sql
+mysql -u root -p worker_allocation_db < /path/to/your/file.sql
 
 # Verify: Check if new tables exist
-mysql -u root -p -e "USE attendance-system; SHOW TABLES;"
+mysql -u root -p -e "USE worker_allocation_db; SHOW TABLES;"
 ```
 
 ---
@@ -61,12 +61,18 @@ Your `.env` files are critical and are **NOT** tracked by Git (they are in `.git
 ```bash
 /var/www/drag-drop/backend/.env
 ```
-*(Ensure `PORT=5010` and `SERVICE_API_KEY` are set here!)*
+*(Ensure `PORT=5010`, `SERVICE_API_KEY`, and `V2_ATTENDANCE_API_URL` (e.g. `http://72.62.254.60:5002`) are set here!)*
 
 **Frontend .env.local location:**
 ```bash
 /var/www/drag-drop/frontend/.env.local
 ```
+
+**V2 Attendance Backend .env location:**
+```bash
+/var/www/version2_attendance/backend/.env
+```
+*(Ensure `SITE_ALLOCATION_API_URL=http://localhost:5010` is set here so it can talk to the drag&drop backend!)*
 
 If you ever need to change environment variables, edit these files directly:
 ```bash
