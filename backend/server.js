@@ -239,6 +239,42 @@ app.get('/api/get_data', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
+// 1.1. GET /api/allocations/verify - Verify worker allocation for today
+// ----------------------------------------------------------------------
+app.get('/api/allocations/verify', async (req, res) => {
+  try {
+    const { employeeId, branchCode, date } = req.query;
+
+    if (!employeeId || !branchCode || !date) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters' });
+    }
+
+    // 1. Get Project ID from branchCode
+    const [pRows] = await pool.query('SELECT id FROM \`attendance-system\`.branches WHERE branch_code = ?', [branchCode]);
+    if (pRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Project not found for branchCode: ' + branchCode });
+    }
+    const project = pRows[0];
+
+    // 2. Check Allocations table
+    const [allocRows] = await pool.query(`
+      SELECT id FROM allocations 
+      WHERE worker_id = ? AND project_id = ? AND allocation_date = ?
+    `, [employeeId, project.id, date]);
+
+    if (allocRows.length > 0) {
+      return res.json({ success: true, allocated: true });
+    } else {
+      return res.json({ success: true, allocated: false });
+    }
+
+  } catch (err) {
+    console.error('Error verifying allocation:', err.message);
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message });
+  }
+});
+
+// ----------------------------------------------------------------------
 // 1.5. POST /api/allocations/sync_transfer - Sync worker transfer from Attendance
 // ----------------------------------------------------------------------
 app.post('/api/allocations/sync_transfer', mutationLimiter, async (req, res) => {
