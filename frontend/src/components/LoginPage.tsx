@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, User, Shield, HardHat, Briefcase, ChevronRight, AlertCircle, Building2, Eye, EyeOff } from 'lucide-react';
+import { Lock, User, ChevronRight, AlertCircle, Building2, Eye, EyeOff } from 'lucide-react';
 import type { AuthUser, UserRole } from '../types/auth';
 import axios from 'axios';
 
@@ -69,21 +69,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleQuickDemoLogin = (role: UserRole) => {
-    if (role === 'engineer') {
-      setUsername('engineer');
-      setPassword('password123');
-      handleLogin(undefined, 'engineer', 'password123');
-    } else if (role === 'admin') {
-      setUsername('admin');
-      setPassword('password123');
-      handleLogin(undefined, 'admin', 'password123');
-    } else if (role === 'super_admin') {
-      setUsername('super_admin');
-      setPassword('password123');
-      handleLogin(undefined, 'super_admin', 'password123');
-    }
-  };
+
 
   return (
     <div className="min-h-screen w-screen bg-[#090d16] flex items-center justify-center p-4 relative overflow-hidden select-none font-sans">
