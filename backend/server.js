@@ -20,6 +20,16 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5001;
+const V2_ATTENDANCE_API_URL = process.env.V2_ATTENDANCE_API_URL || 'http://localhost:5000';
+
+function formatProfilePhotoUrl(imagePath) {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) return imagePath;
+  if (imagePath.startsWith('uploads/') || imagePath.startsWith('assets/')) {
+    return `${V2_ATTENDANCE_API_URL}/${imagePath}`;
+  }
+  return `${V2_ATTENDANCE_API_URL}/assets/profile-images/employees/${imagePath}`;
+}
 
 // System Users Store (In-Memory Fallback & Database Seed)
 let systemUsers = [
@@ -196,6 +206,7 @@ app.get('/api/get_data', async (req, res) => {
     const [workers] = await pool.query(
       "SELECT id, CONCAT(first_name, ' ', last_name) AS name, position AS trade, skill_level, IF(branch_code IS NOT NULL AND branch_code != '', 'Assigned', 'Available') AS status, experience, profile_image AS profile_photo_url, address, phone_number, created_at FROM \`attendance-system\`.employees ORDER BY id ASC"
     );
+    workers.forEach(w => w.profile_photo_url = formatProfilePhotoUrl(w.profile_photo_url));
     const [projects] = await pool.query(
       "SELECT id, id AS site_number, branch_name AS name, address AS description, status, created_at FROM \`attendance-system\`.branches ORDER BY id ASC"
     );
@@ -223,6 +234,7 @@ app.get('/api/get_data', async (req, res) => {
         ORDER BY p.id ASC, a.day_of_week ASC
       `);
       allocations = allocRows;
+      allocations.forEach(a => a.worker_photo = formatProfilePhotoUrl(a.worker_photo));
     } catch (allocErr) {
       console.warn('Fallback query for allocations:', allocErr.message);
     }
@@ -304,7 +316,7 @@ app.post('/api/allocations/sync_transfer', mutationLimiter, async (req, res) => 
       assigned_by: 'Attendance Sync',
       worker_name: worker.name,
       worker_trade: worker.trade,
-      worker_photo: worker.profile_photo_url,
+      worker_photo: formatProfilePhotoUrl(worker.profile_photo_url),
       project_name: project.name
     };
 
@@ -385,7 +397,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
         assigned_by: assignedBy,
         worker_name: worker.name,
         worker_trade: worker.trade,
-        worker_photo: worker.profile_photo_url,
+        worker_photo: formatProfilePhotoUrl(worker.profile_photo_url),
         project_name: project.name || ''
       };
 
@@ -422,7 +434,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
       assigned_by: assignedBy,
       worker_name: worker.name,
       worker_trade: worker.trade,
-      worker_photo: worker.profile_photo_url,
+      worker_photo: formatProfilePhotoUrl(worker.profile_photo_url),
       project_name: project.name || ''
     };
 
