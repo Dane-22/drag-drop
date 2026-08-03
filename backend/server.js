@@ -610,7 +610,7 @@ app.get('/api/allocations/verify', async (req, res) => {
        FROM allocations a
        JOIN \`attendance-system\`.branches p ON a.project_id = p.id
        WHERE a.worker_id = ? 
-         AND a.allocation_date = ? 
+         AND DATE(a.allocation_date) = ? 
          AND p.branch_code = ?`,
       [employeeId, date, branchCode]
     );
