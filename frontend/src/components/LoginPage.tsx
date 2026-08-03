@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, User, Shield, HardHat, Briefcase, ChevronRight, AlertCircle, Building2 } from 'lucide-react';
+import { Lock, User, Shield, HardHat, Briefcase, ChevronRight, AlertCircle, Building2, Eye, EyeOff } from 'lucide-react';
 import type { AuthUser, UserRole } from '../types/auth';
 import axios from 'axios';
 
@@ -12,6 +12,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -136,12 +137,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0d1829] border border-[#21385c] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brandOrange-500 transition-all"
+                className="w-full bg-[#0d1829] border border-[#21385c] rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brandOrange-500 transition-all"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-300 transition-colors"
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -155,41 +164,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </button>
         </form>
 
-        {/* Quick Demo Login Bar */}
-        <div className="mt-8 pt-6 border-t border-[#21385c]">
-          <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center mb-3">
-            Quick 1-Click Demo Logins
-          </span>
 
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleQuickDemoLogin('engineer')}
-              className="p-2.5 rounded-xl bg-[#0d1829] hover:bg-[#122138] border border-[#21385c] hover:border-brandOrange-500/50 text-left transition-all group cursor-pointer"
-            >
-              <HardHat className="w-4 h-4 text-amber-500 mb-1 group-hover:scale-110 transition-transform" />
-              <div className="text-[11px] font-extrabold text-white">Engineer</div>
-              <div className="text-[9px] text-slate-400 leading-tight truncate">Site Allocation</div>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoLogin('admin')}
-              className="p-2.5 rounded-xl bg-[#0d1829] hover:bg-[#122138] border border-[#21385c] hover:border-sky-500/50 text-left transition-all group cursor-pointer"
-            >
-              <Briefcase className="w-4 h-4 text-sky-400 mb-1 group-hover:scale-110 transition-transform" />
-              <div className="text-[11px] font-extrabold text-white">Admin</div>
-              <div className="text-[9px] text-slate-400 leading-tight truncate">Full Operation</div>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemoLogin('super_admin')}
-              className="p-2.5 rounded-xl bg-[#0d1829] hover:bg-[#122138] border border-[#21385c] hover:border-purple-500/50 text-left transition-all group cursor-pointer"
-            >
-              <Shield className="w-4 h-4 text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
-              <div className="text-[11px] font-extrabold text-white">Super Admin</div>
-              <div className="text-[9px] text-slate-400 leading-tight truncate">User Admin + All</div>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
