@@ -157,9 +157,9 @@ export const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
   selectedWorkerId,
   activeDragsMap = {},
   viewMode = 'week',
-  selectedDate = '2026-07-27',
-  selectedWeekStart = '2026-07-27',
-  selectedMonth = '2026-07',
+  selectedDate,
+  selectedWeekStart,
+  selectedMonth,
   onAllocateWorkerDirectly,
   onOpenAddWorkerModal
 }) => {

@@ -24,11 +24,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   activePage = 'site_allocation',
   viewMode = 'week',
   onSelectViewMode,
-  selectedDate = '2026-07-27',
+  selectedDate,
   onSelectDate,
-  selectedWeekStart = '2026-07-27',
+  selectedWeekStart,
   onSelectWeekStart,
-  selectedMonth = '2026-07',
+  selectedMonth,
   onSelectMonth,
   onLogout,
   isNavVisible = true,
@@ -58,19 +58,55 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     return 'bg-amber-600 border-amber-400 text-white';
   };
 
-  // Pre-configured upcoming week options
-  const weekOptions = [
-    { value: '2026-07-27', label: 'Current Week (Jul 27 – Aug 02, 2026)' },
-    { value: '2026-08-03', label: 'Next Week (Aug 03 – Aug 09, 2026)' },
-    { value: '2026-08-10', label: 'Week 3 (Aug 10 – Aug 16, 2026)' },
-    { value: '2026-08-17', label: 'Week 4 (Aug 17 – Aug 23, 2026)' }
-  ];
+  // Dynamically generated week options
+  const weekOptions = React.useMemo(() => {
+    const options = [];
+    const date = new Date();
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    const currentWeekStart = new Date(date.setDate(diff));
+    
+    for (let i = -1; i < 4; i++) {
+      const start = new Date(currentWeekStart);
+      start.setDate(start.getDate() + (i * 7));
+      
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      
+      const value = start.toISOString().split('T')[0];
+      const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+      const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+      const year = start.getFullYear();
+      
+      let prefix = `Week ${i + 1}`;
+      if (i === -1) prefix = 'Last Week';
+      if (i === 0) prefix = 'Current Week';
+      if (i === 1) prefix = 'Next Week';
+      if (i === 2) prefix = 'Week 3';
+      if (i === 3) prefix = 'Week 4';
+      
+      const label = `${prefix} (${startLabel} – ${endLabel}, ${year})`;
+      options.push({ value, label });
+    }
+    return options;
+  }, []);
 
-  const monthOptions = [
-    { value: '2026-07', label: 'July 2026' },
-    { value: '2026-08', label: 'August 2026' },
-    { value: '2026-09', label: 'September 2026' }
-  ];
+  // Dynamically generated month options
+  const monthOptions = React.useMemo(() => {
+    const options = [];
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    
+    for (let i = -1; i < 4; i++) {
+      const d = new Date(currentMonth);
+      d.setMonth(d.getMonth() + i);
+      
+      const value = d.toISOString().slice(0, 7);
+      const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      options.push({ value, label });
+    }
+    return options;
+  }, []);
 
   // Helper for step day in Day View Mode
   const handleStepDay = (delta: number) => {
