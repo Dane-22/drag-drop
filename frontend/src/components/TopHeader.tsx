@@ -19,16 +19,24 @@ interface TopHeaderProps {
   onToggleNav?: () => void;
 }
 
+const getTodayString = () => new Date().toISOString().split('T')[0];
+const getStartOfWeekStr = () => {
+  const d = new Date();
+  const day = d.getDay();
+  return new Date(d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))).toISOString().split('T')[0];
+};
+const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
+
 export const TopHeader: React.FC<TopHeaderProps> = ({
   currentUser,
   activePage = 'site_allocation',
   viewMode = 'week',
   onSelectViewMode,
-  selectedDate,
+  selectedDate = getTodayString(),
   onSelectDate,
-  selectedWeekStart,
+  selectedWeekStart = getStartOfWeekStr(),
   onSelectWeekStart,
-  selectedMonth,
+  selectedMonth = getCurrentMonthStr(),
   onSelectMonth,
   onLogout,
   isNavVisible = true,

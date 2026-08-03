@@ -10,11 +10,10 @@ When your colleague says "Code is updated on GitHub," run this sequence:
 
 ```bash
 # 1. Enter the project directory
-cd /var/www/drag-drop
+cd /var/www/drag_and_drop
 
 # 2. Pull the latest changes from GitHub
-git fetch origin master
-git reset --hard origin/master
+git pull origin master
 
 # 3. Install any new dependencies
 npm install
@@ -22,10 +21,10 @@ cd backend && npm install
 cd ../frontend && npm install
 
 # 4. Build the frontend (using your Server IP)
-# Replace YOUR_SERVER_IP with your actual IP address
+# Replace 72.62.254.60 with your actual IP address if it changes
 cd ../frontend
-echo "VITE_API_BASE_URL=http://YOUR_SERVER_IP:5010/api" > .env.local
-echo "VITE_WS_URL=http://YOUR_SERVER_IP:5010" >> .env.local
+echo "VITE_API_BASE_URL=http://72.62.254.60:5010/api" > .env.local
+echo "VITE_WS_URL=http://72.62.254.60:5010" >> .env.local
 npm run build
 
 # 5. Restart PM2 services
@@ -59,13 +58,13 @@ Your `.env` files are critical and are **NOT** tracked by Git (they are in `.git
 
 **Backend .env location:**
 ```bash
-/var/www/drag-drop/backend/.env
+/var/www/drag_and_drop/backend/.env
 ```
 *(Ensure `PORT=5010`, `SERVICE_API_KEY`, and `V2_ATTENDANCE_API_URL` (e.g. `http://72.62.254.60:5002`) are set here!)*
 
 **Frontend .env.local location:**
 ```bash
-/var/www/drag-drop/frontend/.env.local
+/var/www/drag_and_drop/frontend/.env.local
 ```
 
 **V2 Attendance Backend .env location:**
@@ -76,8 +75,8 @@ Your `.env` files are critical and are **NOT** tracked by Git (they are in `.git
 
 If you ever need to change environment variables, edit these files directly:
 ```bash
-nano /var/www/drag-drop/backend/.env
-nano /var/www/drag-drop/frontend/.env.local
+nano /var/www/drag_and_drop/backend/.env
+nano /var/www/drag_and_drop/frontend/.env.local
 ```
 
 **Important:** After changing `.env` files, restart the services:
@@ -98,22 +97,21 @@ pm2 restart dragdrop-web --update-env
 | Check PM2 Status | `pm2 status` | To verify both services are running |
 | Monitor API Logs | `pm2 logs dragdrop-api` | Real-time backend monitoring |
 | Monitor Web Logs | `pm2 logs dragdrop-web` | Real-time frontend monitoring |
-| Check .env Files | `ls -la /var/www/drag-drop/backend/.env` | Confirm env files exist |
+| Check .env Files | `ls -la /var/www/drag_and_drop/backend/.env` | Confirm env files exist |
 | Restart Nginx | `sudo systemctl reload nginx` | Apply Nginx config changes |
 
 ---
 
 ## 5. Summary "One-Liner"
 
-For experienced users, run all update steps in a single command (make sure to replace `YOUR_SERVER_IP` with your actual IP):
+For experienced users, run all update steps in a single command (using server IP 72.62.254.60):
 
 ```bash
-cd /var/www/drag-drop && \
-git fetch origin master && \
-git reset --hard origin/master && \
+cd /var/www/drag_and_drop && \
+git pull origin master && \
 npm install && \
 cd backend && npm install && \
-cd ../frontend && npm install && echo "VITE_API_BASE_URL=http://YOUR_SERVER_IP:5010/api" > .env.local && echo "VITE_WS_URL=http://YOUR_SERVER_IP:5010" >> .env.local && npm run build && \
+cd ../frontend && npm install && echo "VITE_API_BASE_URL=http://72.62.254.60:5010/api" > .env.local && echo "VITE_WS_URL=http://72.62.254.60:5010" >> .env.local && npm run build && \
 pm2 restart dragdrop-api --update-env && pm2 restart dragdrop-web --update-env && \
 pm2 status
 ```
@@ -125,22 +123,22 @@ pm2 status
 ### Issue: "Port already in use" (EADDRINUSE)
 **FIX:** Because Docker heavily uses ports 5000 and 5001 on this server, ensure your backend `.env` is set to `PORT=5010`.
 ```bash
-cat /var/www/drag-drop/backend/.env | grep PORT
+cat /var/www/drag_and_drop/backend/.env | grep PORT
 # Should output: PORT=5010
 ```
 
 ### Issue: Integration with Attendance Failing (403 Forbidden)
 **FIX:** Ensure the `SERVICE_API_KEY` matches exactly between both backends:
 ```bash
-cat /var/www/drag-drop/backend/.env | grep SERVICE_API_KEY
-cat /var/www/version2_attendance/backend/.env | grep SITE_ALLOCATION_API_KEY
+cat /var/www/drag_and_drop/backend/.env | grep SERVICE_API_KEY
+cat /var/www/v2_attendance/backend/.env | grep SITE_ALLOCATION_API_KEY
 ```
 
 ### Issue: Frontend shows "Route not found" or Network Errors
 **FIX:** Check that the frontend was built with the correct IP address and port:
 ```bash
-cat /var/www/drag-drop/frontend/.env.local
-# Should show: VITE_API_BASE_URL=http://YOUR_SERVER_IP:5010/api
+cat /var/www/drag_and_drop/frontend/.env.local
+# Should show: VITE_API_BASE_URL=http://72.62.254.60:5010/api
 ```
 
 ---
@@ -148,7 +146,7 @@ cat /var/www/drag-drop/frontend/.env.local
 ## 7. Project Structure on Server
 
 ```
-/var/www/drag-drop/
+/var/www/drag_and_drop/
 ├── backend/           # Node.js API (port 5010)
 │   ├── .env          # Database, JWT & SERVICE_API_KEY config
 │   └── server.js     # Entry point
@@ -175,7 +173,7 @@ cat /var/www/drag-drop/frontend/.env.local
 If a deployment breaks, quickly revert to the previous version:
 
 ```bash
-cd /var/www/drag-drop
+cd /var/www/drag_and_drop
 # View previous commits
 git log --oneline -5
 # Revert to specific commit (replace abc123 with actual commit hash)
@@ -191,11 +189,11 @@ pm2 restart all
 
 After every deployment, verify:
 - [ ] `pm2 status` shows both services as "online"
-- [ ] `http://YOUR_SERVER_IP:3000` loads properly
+- [ ] `http://72.62.254.60:3000` loads properly
 - [ ] Site allocation dashboard displays successfully
 - [ ] Integration: Clock-in from `v2-attendance` successfully validates against this API
 - [ ] No errors in `pm2 logs`
 
 ---
 
-**Server IP:** (Update to your actual server IP)
+**Server IP:** 72.62.254.60

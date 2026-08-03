@@ -148,7 +148,16 @@ const DraggableWorkerCard: React.FC<{
       )}
     </div>
   );
+  );
 };
+
+const getTodayString = () => new Date().toISOString().split('T')[0];
+const getStartOfWeekStr = () => {
+  const d = new Date();
+  const day = d.getDay();
+  return new Date(d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))).toISOString().split('T')[0];
+};
+const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
 
 export const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
   workers = [],
@@ -157,9 +166,9 @@ export const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
   selectedWorkerId,
   activeDragsMap = {},
   viewMode = 'week',
-  selectedDate,
-  selectedWeekStart,
-  selectedMonth,
+  selectedDate = getTodayString(),
+  selectedWeekStart = getStartOfWeekStr(),
+  selectedMonth = getCurrentMonthStr(),
   onAllocateWorkerDirectly,
   onOpenAddWorkerModal
 }) => {

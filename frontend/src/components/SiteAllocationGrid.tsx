@@ -253,7 +253,16 @@ const MatrixCell: React.FC<{
       </div>
     </td>
   );
+  );
 };
+
+const getTodayString = () => new Date().toISOString().split('T')[0];
+const getStartOfWeekStr = () => {
+  const d = new Date();
+  const day = d.getDay();
+  return new Date(d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))).toISOString().split('T')[0];
+};
+const getCurrentMonthStr = () => new Date().toISOString().slice(0, 7);
 
 export const SiteAllocationGrid: React.FC<SiteAllocationGridProps> = ({
   projects = [],
@@ -261,9 +270,9 @@ export const SiteAllocationGrid: React.FC<SiteAllocationGridProps> = ({
   allocations = [],
   activeDragsMap = {},
   viewMode = 'week',
-  selectedDate,
-  selectedWeekStart,
-  selectedMonth = '2026-07',
+  selectedDate = getTodayString(),
+  selectedWeekStart = getStartOfWeekStr(),
+  selectedMonth = getCurrentMonthStr(),
   selectedAllocId,
   onSelectAllocCard,
   onRemoveAllocation,
