@@ -148,7 +148,6 @@ const DraggableWorkerCard: React.FC<{
       )}
     </div>
   );
-  );
 };
 
 const getTodayString = () => new Date().toISOString().split('T')[0];

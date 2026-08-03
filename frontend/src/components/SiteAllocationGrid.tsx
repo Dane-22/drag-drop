@@ -253,7 +253,6 @@ const MatrixCell: React.FC<{
       </div>
     </td>
   );
-  );
 };
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
