@@ -32,6 +32,11 @@ export const globalLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    return token && process.env.SERVICE_API_KEY && token === process.env.SERVICE_API_KEY;
+  },
   message: {
     status: 'error',
     code: 429,
