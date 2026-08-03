@@ -1,0 +1,50 @@
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 20
+      arrivalRate: 5
+      rampTo: 50
+      name: "Ramp up load"
+    - duration: 30
+      arrivalRate: 50
+      name: "Sustained load"
+  engines:
+    socketio-v3: {} # Use socket.io v3/v4 engine
+  environments:
+    dev:
+      target: "http://localhost:5000"
+  
+scenarios:
+  - name: "Login and fetch matrix data"
+    weight: 7
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            username: "admin"
+            password: "password123"
+          capture:
+            - json: "$.token"
+              as: "token"
+      - get:
+          url: "/api/get_data"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  - name: "Socket.io drag presence broadcast"
+    weight: 3
+    engine: socketio-v3
+    flow:
+      - emit:
+          channel: "worker_drag_start"
+          data:
+            worker_id: 1
+            project_id: 1
+            dragged_by: "artillery_bot"
+      - think: 1
+      - emit:
+          channel: "worker_drag_end"
+          data:
+            worker_id: 1
+            project_id: 1
+            dragged_by: "artillery_bot"

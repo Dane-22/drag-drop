@@ -19,7 +19,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = 5001;
 
 // System Users Store (In-Memory Fallback & Database Seed)
 let systemUsers = [
@@ -186,35 +186,7 @@ app.post('/api/users/create', mutationLimiter, (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 0. GET /api/allocations/verify - Integration endpoint for Attendance System
-// ----------------------------------------------------------------------
-app.get('/api/allocations/verify', async (req, res) => {
-  const { employeeId, branchCode, date } = req.query;
 
-  if (!employeeId || !branchCode || !date) {
-    return res.status(400).json({ success: false, message: 'Invalid parameters' });
-  }
-
-  try {
-    const workerId = parseInt(employeeId, 10);
-    
-    const [allocRows] = await pool.query(`
-      SELECT a.id 
-      FROM allocations a
-      JOIN projects p ON a.project_id = p.id
-      WHERE a.worker_id = ? AND (p.name LIKE CONCAT('%', ?, '%') OR p.site_number = ?) AND a.allocation_date = ?
-    `, [workerId, branchCode, branchCode, date]);
-
-    if (allocRows.length > 0) {
-      return res.json({ success: true, allocated: true });
-    } else {
-      return res.json({ success: true, allocated: false });
-    }
-  } catch (err) {
-    console.error('Error verifying allocation:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
 
 // ----------------------------------------------------------------------
 // 1. GET /api/get_data - Read workers, projects, and matrix allocations
@@ -222,10 +194,10 @@ app.get('/api/allocations/verify', async (req, res) => {
 app.get('/api/get_data', async (req, res) => {
   try {
     const [workers] = await pool.query(
-      'SELECT id, name, trade, skill_level, status, experience, profile_photo_url, address, phone_number, created_at FROM workers ORDER BY id ASC'
+      "SELECT id, CONCAT(first_name, ' ', last_name) AS name, position AS trade, skill_level, IF(branch_code IS NOT NULL AND branch_code != '', 'Assigned', 'Available') AS status, experience, profile_image AS profile_photo_url, address, phone_number, created_at FROM \`attendance-system\`.employees ORDER BY id ASC"
     );
     const [projects] = await pool.query(
-      "SELECT id, site_number, name, description, COALESCE(status, 'Active') AS status, created_at FROM projects ORDER BY site_number ASC"
+      "SELECT id, id AS site_number, branch_name AS name, address AS description, status, created_at FROM \`attendance-system\`.branches ORDER BY id ASC"
     );
 
     let allocations = [];
@@ -240,15 +212,15 @@ app.get('/api/get_data', async (req, res) => {
           a.status, 
           a.time_stamp,
           a.assigned_by,
-          w.name AS worker_name,
-          w.trade AS worker_trade,
-          w.profile_photo_url AS worker_photo,
-          p.name AS project_name,
-          p.site_number
+          CONCAT(w.first_name, ' ', w.last_name) AS worker_name,
+          w.position AS worker_trade,
+          w.profile_image AS worker_photo,
+          p.branch_name AS project_name,
+          p.id AS site_number
         FROM allocations a
-        JOIN workers w ON a.worker_id = w.id
-        JOIN projects p ON a.project_id = p.id
-        ORDER BY p.site_number ASC, a.day_of_week ASC
+        JOIN \`attendance-system\`.employees w ON a.worker_id = w.id
+        JOIN \`attendance-system\`.branches p ON a.project_id = p.id
+        ORDER BY p.id ASC, a.day_of_week ASC
       `);
       allocations = allocRows;
     } catch (allocErr) {
@@ -267,6 +239,85 @@ app.get('/api/get_data', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
+// 1.5. POST /api/allocations/sync_transfer - Sync worker transfer from Attendance
+// ----------------------------------------------------------------------
+app.post('/api/allocations/sync_transfer', mutationLimiter, async (req, res) => {
+  try {
+    const { employeeId, branchCode, date } = req.body;
+
+    if (!employeeId || !branchCode || !date) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters' });
+    }
+
+    // 1. Get Project ID from branchCode
+    const [pRows] = await pool.query('SELECT id, branch_name AS name FROM \`attendance-system\`.branches WHERE branch_code = ?', [branchCode]);
+    if (pRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Project not found for branchCode: ' + branchCode });
+    }
+    const project = pRows[0];
+
+    // 2. Get Worker Info
+    const [wRows] = await pool.query("SELECT CONCAT(first_name, ' ', last_name) AS name, position AS trade, profile_image AS profile_photo_url FROM \`attendance-system\`.employees WHERE id = ?", [employeeId]);
+    if (wRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Worker not found' });
+    }
+    const worker = wRows[0];
+
+    // 3. Determine Day of Week
+    const dateObj = new Date(date);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const day_of_week = days[dateObj.getDay()];
+
+    // 4. Upsert Allocation
+    const [existingRows] = await pool.query(`
+      SELECT id FROM allocations 
+      WHERE worker_id = ? AND allocation_date = ?
+    `, [employeeId, date]);
+
+    let allocationId;
+    let isTransfer = false;
+
+    if (existingRows.length > 0) {
+      allocationId = existingRows[0].id;
+      isTransfer = true;
+      await pool.query(`
+        UPDATE allocations 
+        SET project_id = ?, day_of_week = ?, assigned_by = ?
+        WHERE id = ?
+      `, [project.id, day_of_week, 'Attendance Sync', allocationId]);
+    } else {
+      const [insertResult] = await pool.query(`
+        INSERT INTO allocations (worker_id, project_id, day_of_week, allocation_date, assigned_by)
+        VALUES (?, ?, ?, ?, ?)
+      `, [employeeId, project.id, day_of_week, date, 'Attendance Sync']);
+      allocationId = insertResult.insertId;
+    }
+
+    // 5. Emit Event
+    const payload = {
+      id: allocationId,
+      worker_id: Number(employeeId),
+      project_id: project.id,
+      day_of_week,
+      allocation_date: date,
+      status: 'assigned',
+      assigned_by: 'Attendance Sync',
+      worker_name: worker.name,
+      worker_trade: worker.trade,
+      worker_photo: worker.profile_photo_url,
+      project_name: project.name
+    };
+
+    io.emit('allocation_updated', { is_transfer: isTransfer, allocation: payload });
+
+    res.json({ success: true, message: 'Allocation synced successfully', data: payload });
+  } catch (err) {
+    console.error('Error syncing transfer allocation:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ----------------------------------------------------------------------
 // 2. POST /api/allocate_worker - Auto-Transfer & Allocate Worker (Protected with mutationLimiter)
 // ----------------------------------------------------------------------
 app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema), async (req, res) => {
@@ -276,24 +327,40 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
   const assignedBy = req.user?.name || 'Dispatcher Admin';
 
   try {
-    const [wRows] = await pool.query('SELECT name, trade, profile_photo_url FROM workers WHERE id = ?', [worker_id]);
+    const [wRows] = await pool.query("SELECT CONCAT(first_name, ' ', last_name) AS name, position AS trade, profile_image AS profile_photo_url FROM \`attendance-system\`.employees WHERE id = ?", [worker_id]);
     if (wRows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'Worker not found' });
     }
     const worker = wRows[0];
 
-    const [pRows] = await pool.query('SELECT name, site_number FROM projects WHERE id = ?', [project_id]);
+    const [pRows] = await pool.query('SELECT branch_name AS name, id AS site_number, branch_code FROM \`attendance-system\`.branches WHERE id = ?', [project_id]);
     const project = pRows[0] || {};
+    const branchCode = project.branch_code;
 
     const [existingRows] = await pool.query(`
-      SELECT a.id, a.project_id, p.name AS old_project_name, p.site_number AS old_site_number
+      SELECT a.id, a.project_id, p.branch_name AS old_project_name, p.id AS old_site_number
       FROM allocations a
-      JOIN projects p ON a.project_id = p.id
+      JOIN \`attendance-system\`.branches p ON a.project_id = p.id
       WHERE a.worker_id = ? AND a.day_of_week = ?
     `, [worker_id, day_of_week]);
 
     let isTransfer = false;
     let oldSiteName = '';
+
+    // Fire-and-forget sync function
+    const syncToAttendance = () => {
+      if (branchCode) {
+        fetch('http://localhost:5000/api/webhooks/drag-and-drop-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: worker_id,
+            branchCode: branchCode,
+            date: allocDate
+          })
+        }).catch(err => console.error('[Sync] Failed to sync to attendance system:', err.message));
+      }
+    };
 
     if (existingRows.length > 0) {
       if (existingRows[0].project_id != project_id) {
@@ -322,6 +389,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
       };
 
       io.emit('allocation_updated', { is_transfer: isTransfer, allocation: payload });
+      syncToAttendance();
 
       return res.json({
         status: 'success',
@@ -333,8 +401,8 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
       });
     }
 
-    // Sync worker status in DB
-    await pool.query("UPDATE workers SET status = 'Assigned' WHERE id = ?", [worker_id]);
+    // Sync worker status in DB is now managed by attendance-system webhook
+    // await pool.query("UPDATE workers SET status = 'Assigned' WHERE id = ?", [worker_id]);
 
     let insertId = Date.now();
     const [result] = await pool.query(`
@@ -358,6 +426,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
     };
 
     io.emit('allocation_updated', { is_transfer: false, allocation: payload });
+    syncToAttendance();
 
     res.json({
       status: 'success',
@@ -397,7 +466,8 @@ app.post('/api/remove_allocation', mutationLimiter, validate(removeAllocationSch
     if (targetWorkerId) {
       const [remRows] = await pool.query('SELECT COUNT(*) AS cnt FROM allocations WHERE worker_id = ?', [targetWorkerId]);
       if (remRows[0]?.cnt === 0) {
-        await pool.query("UPDATE workers SET status = 'Available' WHERE id = ?", [targetWorkerId]);
+        // Status now managed by attendance-system webhook (branch_code will be cleared)
+        // await pool.query("UPDATE workers SET status = 'Available' WHERE id = ?", [targetWorkerId]);
       }
     }
 
@@ -417,17 +487,15 @@ app.post('/api/create_project', mutationLimiter, validate(createProjectSchema), 
   const { name, description } = req.body;
 
   try {
-    const [maxRows] = await pool.query('SELECT MAX(site_number) AS maxSite FROM projects');
-    const nextSite = (maxRows[0]?.maxSite || 0) + 1;
-
+    const branchCode = 'B' + Math.floor(Math.random() * 100000); // Generate simple branch_code
     const [result] = await pool.query(
-      'INSERT INTO projects (site_number, name, description) VALUES (?, ?, ?)',
-      [nextSite, name.trim(), (description || '').trim()]
+      'INSERT INTO \`attendance-system\`.branches (branch_name, address, branch_code) VALUES (?, ?, ?)',
+      [name.trim(), (description || '').trim(), branchCode]
     );
 
     const newProject = {
       id: result.insertId,
-      site_number: nextSite,
+      site_number: result.insertId,
       name: name.trim(),
       description: (description || '').trim()
     };
@@ -457,7 +525,7 @@ app.post('/api/toggle_project_status', mutationLimiter, async (req, res) => {
   const newStatus = status === 'Inactive' ? 'Inactive' : 'Active';
 
   try {
-    await pool.query('UPDATE projects SET status = ? WHERE id = ?', [newStatus, project_id]);
+    await pool.query('UPDATE \`attendance-system\`.branches SET status = ? WHERE id = ?', [newStatus, project_id]);
 
     const payload = { id: Number(project_id), status: newStatus };
     io.emit('site_status_updated', payload);
@@ -485,12 +553,12 @@ app.post('/api/update_project', mutationLimiter, async (req, res) => {
   try {
     const updatedStatus = status === 'Inactive' ? 'Inactive' : 'Active';
     await pool.query(
-      'UPDATE projects SET name = ?, description = ?, status = ? WHERE id = ?',
+      'UPDATE \`attendance-system\`.branches SET branch_name = ?, address = ?, status = ? WHERE id = ?',
       [name.trim(), (description || '').trim(), updatedStatus, project_id]
     );
 
     const [rows] = await pool.query(
-      "SELECT id, site_number, name, description, COALESCE(status, 'Active') AS status, created_at FROM projects WHERE id = ?",
+      "SELECT id, id AS site_number, branch_name AS name, address AS description, status, created_at FROM \`attendance-system\`.branches WHERE id = ?",
       [project_id]
     );
 
@@ -509,54 +577,41 @@ app.post('/api/update_project', mutationLimiter, async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
-// 8. POST /api/create_worker - Add a new worker dynamically (Protected with mutationLimiter)
+// 7.4. GET /api/allocations/verify - Check if worker is allocated
 // ----------------------------------------------------------------------
-app.post('/api/create_worker', mutationLimiter, validate(createWorkerSchema), async (req, res) => {
-  const { name, trade, experience, skill_level, profile_photo_url } = req.body;
-
-  const photos = [
-    'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=120&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80'
-  ];
-  const photo = profile_photo_url || photos[Math.floor(Math.random() * photos.length)];
-
+app.get('/api/allocations/verify', async (req, res) => {
   try {
-    const [result] = await pool.query(
-      'INSERT INTO workers (name, trade, experience, skill_level, status, profile_photo_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        name.trim(),
-        trade.trim(),
-        experience || '5 yrs Exp.',
-        skill_level || 'Licensed',
-        'Available',
-        photo
-      ]
+    const { employeeId, branchCode, date } = req.query;
+
+    console.log(`[VERIFY] Params: employeeId=${employeeId}, branchCode=${branchCode}, date=${date}`);
+
+    if (!employeeId || !branchCode || !date) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters' });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT a.id, a.allocation_date, p.branch_code, a.worker_id 
+       FROM allocations a
+       JOIN \`attendance-system\`.branches p ON a.project_id = p.id
+       WHERE a.worker_id = ? 
+         AND a.allocation_date = ? 
+         AND p.branch_code = ?`,
+      [employeeId, date, branchCode]
     );
 
-    const newWorker = {
-      id: result.insertId,
-      name: name.trim(),
-      trade: trade.trim(),
-      experience: experience || '5 yrs Exp.',
-      skill_level: skill_level || 'Licensed',
-      status: 'Available',
-      profile_photo_url: photo
-    };
+    const allocated = rows.length > 0;
 
-    io.emit('worker_created', newWorker);
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Worker added successfully',
-      data: newWorker
+    res.json({
+      success: true,
+      allocated
     });
   } catch (err) {
-    console.error('Error adding worker:', err);
-    res.status(500).json({ status: 'error', message: err.message });
+    console.error('Error verifying allocation:', err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// Webhook /api/projects/sync has been removed as it is no longer necessary.
 
 // Start Express HTTP & Socket.io server
 httpServer.listen(PORT, () => {

@@ -1,0 +1,19 @@
+{
+  "name": "stress-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test:autocannon": "node autocannon-test.js",
+    "test:artillery": "npx artillery run artillery-scenario.yml"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "artillery": "^2.0.33",
+    "artillery-engine-socketio-v3": "^1.2.0",
+    "autocannon": "^8.0.0"
+  }
+}
