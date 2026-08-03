@@ -24,10 +24,14 @@ const V2_ATTENDANCE_API_URL = process.env.V2_ATTENDANCE_API_URL || 'http://local
 function formatProfilePhotoUrl(imagePath) {
   if (!imagePath) return null;
   if (imagePath.startsWith('http')) return imagePath;
-  if (imagePath.startsWith('uploads/') || imagePath.startsWith('assets/')) {
-    return `${V2_ATTENDANCE_API_URL}/${imagePath}`;
+  
+  // Clean leading slash if any
+  const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+  
+  if (cleanPath.startsWith('uploads/') || cleanPath.startsWith('assets/')) {
+    return `${V2_ATTENDANCE_API_URL}/${cleanPath}`;
   }
-  return `${V2_ATTENDANCE_API_URL}/assets/profile-images/employees/${imagePath}`;
+  return `${V2_ATTENDANCE_API_URL}/assets/profile-images/employees/${cleanPath}`;
 }
 
 // System Users Store (In-Memory Fallback & Database Seed)
