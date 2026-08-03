@@ -19,7 +19,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 
 // System Users Store (In-Memory Fallback & Database Seed)
 let systemUsers = [
