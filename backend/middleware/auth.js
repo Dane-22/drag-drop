@@ -18,10 +18,9 @@ export const authenticateToken = (req, res, next) => {
     return next();
   }
 
-  // For development & seamless backwards compatibility, if no token header is provided, attach default dispatcher session
+  // If no token is provided, deny access
   if (!token) {
-    req.user = { id: 1, name: 'Dispatcher Admin', role: 'admin' };
-    return next();
+    return res.status(401).json({ status: 'error', message: 'Authentication required' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {

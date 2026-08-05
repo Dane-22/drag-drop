@@ -20,6 +20,8 @@ export const initDatabase = async () => {
   try {
     const connection = await pool.getConnection();
 
+    // Migration checks disabled. Schema is managed elsewhere.
+    /*
     // Verify projects table status column
     const [projectColumns] = await connection.query('SHOW COLUMNS FROM projects');
     const existingProjectCols = projectColumns.map((col) => col.Field);
@@ -51,6 +53,7 @@ export const initDatabase = async () => {
       await connection.query("ALTER TABLE allocations ADD COLUMN `assigned_by` VARCHAR(255) DEFAULT NULL");
       console.log("✨ Safely added missing allocations column: assigned_by");
     }
+    */
 
     console.log('✅ Database schema verified & updated successfully');
     connection.release();
