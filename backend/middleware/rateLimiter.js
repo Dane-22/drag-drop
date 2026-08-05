@@ -13,12 +13,17 @@ export const authLimiter = rateLimit({
   }
 });
 
-// 2. Field Operations & Data Mutation Limiter (60 requests per 1 minute per IP)
+// 2. Field Operations & Data Mutation Limiter (150 requests per 1 minute per IP)
 export const mutationLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60,
+  max: 150,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    return token && process.env.SERVICE_API_KEY && token === process.env.SERVICE_API_KEY;
+  },
   message: {
     status: 'error',
     code: 429,

@@ -298,8 +298,8 @@ export const SiteAllocationGrid: React.FC<SiteAllocationGridProps> = ({
   const targetSingleDay: DayOfWeek = (['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(selectedDate).getDay()]) as DayOfWeek;
   const singleDayLabel = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-  // Calculate filtered allocations for totals
-  const getFilteredAllocations = () => {
+  // Calculate filtered allocations for totals using useMemo to prevent re-computation on every render frame
+  const filteredAllocations = React.useMemo(() => {
     return allocations.filter((a) => {
       if (viewMode === 'day') {
         const cleanAllocDate = a.allocation_date?.substring(0, 10);
@@ -316,9 +316,7 @@ export const SiteAllocationGrid: React.FC<SiteAllocationGridProps> = ({
       }
       return true;
     });
-  };
-
-  const filteredAllocations = getFilteredAllocations();
+  }, [allocations, viewMode, selectedDate, selectedWeekStart, selectedMonth, selectedMobileDay]);
 
   return (
     <main className="flex-1 bg-slate-100 flex flex-col h-full overflow-hidden select-none">
@@ -494,7 +492,7 @@ export const SiteAllocationGrid: React.FC<SiteAllocationGridProps> = ({
 
                     {/* Month View Cell */}
                     {viewMode === 'month' && (() => {
-                      const monthAllocations = allocations.filter((a) => a.project_id === project.id && (a.allocation_date ? a.allocation_date.startsWith(selectedMonth) : true));
+                      const monthAllocations = filteredAllocations.filter((a) => a.project_id === project.id);
                       
                       // Calculate unique workers
                       const uniqueWorkersMap = new Map();

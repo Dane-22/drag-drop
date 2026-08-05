@@ -11,7 +11,8 @@ export const removeAllocationSchema = z.object({
   id: z.number().or(z.string().regex(/^\d+$/).transform(Number)).optional(),
   worker_id: z.number().or(z.string().regex(/^\d+$/).transform(Number)).optional(),
   project_id: z.number().or(z.string().regex(/^\d+$/).transform(Number)).optional(),
-  day_of_week: z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).optional()
+  day_of_week: z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).optional(),
+  allocation_date: z.string().optional()
 });
 
 export const createProjectSchema = z.object({

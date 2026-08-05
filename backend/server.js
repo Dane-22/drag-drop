@@ -39,6 +39,7 @@ let systemUsers = [
   {
     id: 1,
     username: 'super_admin',
+    password: 'super_password_123', // TODO: Change these in production
     name: 'Director Robert Chen',
     email: 'robert.chen@apexconstruction.com',
     role: 'super_admin',
@@ -48,6 +49,7 @@ let systemUsers = [
   {
     id: 2,
     username: 'admin',
+    password: 'admin_password_123',
     name: 'Sarah Jenkins',
     email: 'sarah.jenkins@apexconstruction.com',
     role: 'admin',
@@ -57,6 +59,7 @@ let systemUsers = [
   {
     id: 3,
     username: 'engineer',
+    password: 'engineer_password_123',
     name: 'Engr. Marcus Vance',
     email: 'marcus.vance@apexconstruction.com',
     role: 'engineer',
@@ -111,30 +114,11 @@ app.post('/api/auth/login', authLimiter, (req, res) => {
   const cleanUser = username.trim().toLowerCase();
 
   let targetUser = systemUsers.find(
-    (u) => u.username.toLowerCase() === cleanUser || u.email.toLowerCase() === cleanUser
+    (u) => (u.username.toLowerCase() === cleanUser || u.email.toLowerCase() === cleanUser) && u.password === password
   );
 
-  // Fallback role resolution for quick demo buttons
   if (!targetUser) {
-    if (cleanUser.includes('super')) {
-      targetUser = systemUsers[0];
-    } else if (cleanUser.includes('admin')) {
-      targetUser = systemUsers[1];
-    } else if (cleanUser.includes('engineer') || cleanUser.includes('engr')) {
-      targetUser = systemUsers[2];
-    }
-  }
-
-  if (!targetUser) {
-    targetUser = {
-      id: Date.now(),
-      username: cleanUser,
-      name: username,
-      email: `${cleanUser}@apexconstruction.com`,
-      role: cleanUser.includes('super') ? 'super_admin' : cleanUser.includes('admin') ? 'admin' : 'engineer',
-      status: 'Active',
-      created_at: new Date().toISOString().split('T')[0]
-    };
+    return res.status(401).json({ status: 'error', message: 'Invalid username or password' });
   }
 
   // Generate JWT Session token with user payload
@@ -207,7 +191,7 @@ app.post('/api/users/create', mutationLimiter, (req, res) => {
 app.get('/api/get_data', async (req, res) => {
   try {
     const [workers] = await pool.query(
-      "SELECT id, CONCAT(first_name, ' ', last_name) AS name, position AS trade, skill_level, IF(branch_code IS NOT NULL AND branch_code != '', 'Assigned', 'Available') AS status, experience, profile_image AS profile_photo_url, address, phone_number, created_at FROM \`attendance-system\`.employees ORDER BY id ASC"
+      "SELECT id, CONCAT(first_name, ' ', last_name) AS name, position AS trade, 'Experienced' AS skill_level, IF(branch_code IS NOT NULL AND branch_code != '', 'Assigned', 'Available') AS status, '5 yrs Exp.' AS experience, profile_image AS profile_photo_url, NULL AS address, NULL AS phone_number, created_at FROM \`attendance-system\`.employees ORDER BY id ASC"
     );
     workers.forEach(w => w.profile_photo_url = formatProfilePhotoUrl(w.profile_photo_url));
     const [projects] = await pool.query(
@@ -234,6 +218,8 @@ app.get('/api/get_data', async (req, res) => {
         FROM allocations a
         JOIN \`attendance-system\`.employees w ON a.worker_id = w.id
         JOIN \`attendance-system\`.branches p ON a.project_id = p.id
+        WHERE a.allocation_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+          AND a.allocation_date <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)
         ORDER BY p.id ASC, a.day_of_week ASC
       `);
       allocations = allocRows;
@@ -356,8 +342,8 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
       SELECT a.id, a.project_id, p.branch_name AS old_project_name, p.id AS old_site_number
       FROM allocations a
       JOIN \`attendance-system\`.branches p ON a.project_id = p.id
-      WHERE a.worker_id = ? AND a.day_of_week = ?
-    `, [worker_id, day_of_week]);
+      WHERE a.worker_id = ? AND a.allocation_date = ?
+    `, [worker_id, allocDate]);
 
     let isTransfer = false;
     let oldSiteName = '';
@@ -460,7 +446,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
 // 3. POST /api/remove_allocation - Unallocate worker (Protected with mutationLimiter)
 // ----------------------------------------------------------------------
 app.post('/api/remove_allocation', mutationLimiter, validate(removeAllocationSchema), async (req, res) => {
-  const { id, worker_id, project_id, day_of_week } = req.body;
+  const { id, worker_id, project_id, day_of_week, allocation_date } = req.body;
 
   try {
     let targetWorkerId = worker_id;
@@ -471,11 +457,11 @@ app.post('/api/remove_allocation', mutationLimiter, validate(removeAllocationSch
 
     if (id) {
       await pool.query('DELETE FROM allocations WHERE id = ?', [id]);
-    } else if (worker_id && project_id && day_of_week) {
-      await pool.query('DELETE FROM allocations WHERE worker_id = ? AND project_id = ? AND day_of_week = ?', [
+    } else if (worker_id && project_id && allocation_date) {
+      await pool.query('DELETE FROM allocations WHERE worker_id = ? AND project_id = ? AND allocation_date = ?', [
         worker_id,
         project_id,
-        day_of_week
+        allocation_date
       ]);
     }
 

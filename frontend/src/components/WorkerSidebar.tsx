@@ -299,31 +299,35 @@ export const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
     return { isFullyAssigned: false, isPartiallyAssigned: false, siteLabel: 'Available', fullSiteList: 'Available' };
   };
 
-  const unassignedWorkers = workers.filter((w) => !getWorkerAllocationInfo(w.id).isFullyAssigned);
+  const unassignedWorkers = React.useMemo(() => {
+    return workers.filter((w) => !getWorkerAllocationInfo(w.id).isFullyAssigned);
+  }, [workers, allocations, viewMode, selectedDate, selectedWeekStart, selectedMonth, projects]);
 
   // Extract unique trade, skill, and status values
   const trades = Array.from(new Set(workers.map((w) => w.trade))).filter(Boolean);
   const skills = Array.from(new Set(workers.map((w) => w.skill_level || 'Experienced'))).filter(Boolean);
   const statuses = ['Available', 'Assigned'];
 
-  const filteredWorkers = workers.filter((w) => {
-    const allocInfo = getWorkerAllocationInfo(w.id);
-    
-    // Remove worker's card if the status is assigned
-    if (allocInfo.isFullyAssigned) return false;
+  const filteredWorkers = React.useMemo(() => {
+    return workers.filter((w) => {
+      const allocInfo = getWorkerAllocationInfo(w.id);
+      
+      // Remove worker's card if the status is assigned
+      if (allocInfo.isFullyAssigned) return false;
 
-    const currentComputedStatus = 'Available';
+      const currentComputedStatus = 'Available';
 
-    const matchesSearch =
-      w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.trade.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch =
+        w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        w.trade.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesTrade = !selectedTrade || w.trade.toLowerCase() === selectedTrade.toLowerCase();
-    const matchesSkill = !selectedSkill || (w.skill_level || 'Experienced').toLowerCase() === selectedSkill.toLowerCase();
-    const matchesStatus = !selectedStatus || currentComputedStatus.toLowerCase() === selectedStatus.toLowerCase();
+      const matchesTrade = !selectedTrade || w.trade.toLowerCase() === selectedTrade.toLowerCase();
+      const matchesSkill = !selectedSkill || (w.skill_level || 'Experienced').toLowerCase() === selectedSkill.toLowerCase();
+      const matchesStatus = !selectedStatus || currentComputedStatus.toLowerCase() === selectedStatus.toLowerCase();
 
-    return matchesSearch && matchesTrade && matchesSkill && matchesStatus;
-  });
+      return matchesSearch && matchesTrade && matchesSkill && matchesStatus;
+    });
+  }, [workers, searchTerm, selectedTrade, selectedSkill, selectedStatus, allocations, viewMode, selectedDate, selectedWeekStart, selectedMonth, projects]);
 
   const clearFilters = () => {
     setSearchTerm('');

@@ -506,10 +506,6 @@ export const App: React.FC = () => {
   const handleToggleSiteStatus = async (projectId: number, currentStatus: string) => {
     const nextStatus = currentStatus === 'Inactive' ? 'Active' : 'Inactive';
 
-    setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, status: nextStatus } : p))
-    );
-
     try {
       const res = await axios.post(`${API_BASE}/toggle_project_status`, {
         project_id: projectId,
@@ -542,10 +538,6 @@ export const App: React.FC = () => {
     description: string,
     status: 'Active' | 'Inactive'
   ) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, name, description, status } : p))
-    );
-
     try {
       const res = await axios.post(`${API_BASE}/update_project`, {
         project_id: projectId,
