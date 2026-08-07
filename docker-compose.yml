@@ -21,10 +21,9 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 5000
-      DB_HOST: host.docker.internal
-      DB_PORT: 3306
+      DB_SOCKET: /var/run/mysqld/mysqld.sock
       DB_USER: root
-      DB_PASSWORD: rootpassword
+      DB_PASSWORD: ""
       DB_NAME: worker_allocation_db
       JWT_SECRET: super_secret_worker_allocation_key_2026
       REDIS_URL: redis://redis:6379
@@ -34,6 +33,8 @@ services:
       - redis
     networks:
       - app-network
+    volumes:
+      - /var/run/mysqld/mysqld.sock:/var/run/mysqld/mysqld.sock
 
   # React Frontend Container
   frontend:
