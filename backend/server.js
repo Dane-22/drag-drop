@@ -35,39 +35,7 @@ function formatProfilePhotoUrl(imagePath) {
   return `${V2_ATTENDANCE_API_URL}/assets/profile-images/employees/${cleanPath}`;
 }
 
-// System Users Store (In-Memory Fallback & Database Seed)
-let systemUsers = [
-  {
-    id: 1,
-    username: 'super_admin',
-    password: 'super_password_123', // TODO: Change these in production
-    name: 'Director Robert Chen',
-    email: 'robert.chen@apexconstruction.com',
-    role: 'super_admin',
-    status: 'Active',
-    created_at: '2026-01-15'
-  },
-  {
-    id: 2,
-    username: 'admin',
-    password: 'admin_password_123',
-    name: 'Sarah Jenkins',
-    email: 'sarah.jenkins@apexconstruction.com',
-    role: 'admin',
-    status: 'Active',
-    created_at: '2026-02-01'
-  },
-  {
-    id: 3,
-    username: 'engineer',
-    password: 'engineer_password_123',
-    name: 'Engr. Marcus Vance',
-    email: 'marcus.vance@apexconstruction.com',
-    role: 'engineer',
-    status: 'Active',
-    created_at: '2026-03-10'
-  }
-];
+
 
 // Initialize Socket.io Server for Real-Time Dispatcher Sync
 const io = new Server(httpServer, {
@@ -106,7 +74,7 @@ io.on('connection', (socket) => {
 // ----------------------------------------------------------------------
 // Auth Route: POST /api/auth/login (Protected with authLimiter: 5 attempts/15m)
 // ----------------------------------------------------------------------
-app.post('/api/auth/login', authLimiter, (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ status: 'error', message: 'Username and password required' });
@@ -114,28 +82,47 @@ app.post('/api/auth/login', authLimiter, (req, res) => {
 
   const cleanUser = username.trim().toLowerCase();
 
-  let targetUser = systemUsers.find(
-    (u) => (u.username.toLowerCase() === cleanUser || u.email.toLowerCase() === cleanUser) && u.password === password
-  );
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM users WHERE (LOWER(username) = ? OR LOWER(email) = ?) AND password = ?',
+      [cleanUser, cleanUser, password]
+    );
 
-  if (!targetUser) {
-    return res.status(401).json({ status: 'error', message: 'Invalid username or password' });
+    if (rows.length === 0) {
+      return res.status(401).json({ status: 'error', message: 'Invalid username or password' });
+    }
+
+    const targetUser = rows[0];
+
+    if (targetUser.status !== 'Active') {
+      return res.status(403).json({ status: 'error', message: 'Account is deactivated' });
+    }
+
+    // Generate JWT Session token with user payload
+    const token = generateToken({
+      id: targetUser.id,
+      username: targetUser.username,
+      name: targetUser.name,
+      role: targetUser.role
+    });
+
+    res.json({
+      status: 'success',
+      message: `Logged in successfully as ${targetUser.role.toUpperCase()}`,
+      token,
+      user: {
+        id: targetUser.id,
+        username: targetUser.username,
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role,
+        status: targetUser.status
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error during login' });
   }
-
-  // Generate JWT Session token with user payload
-  const token = generateToken({
-    id: targetUser.id,
-    username: targetUser.username,
-    name: targetUser.name,
-    role: targetUser.role
-  });
-
-  res.json({
-    status: 'success',
-    message: `Logged in successfully as ${targetUser.role.toUpperCase()}`,
-    token,
-    user: targetUser
-  });
 });
 
 // Apply Global Rate Limiter & JWT authentication middleware for data endpoints

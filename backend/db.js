@@ -21,39 +21,31 @@ export const initDatabase = async () => {
     const connection = await pool.getConnection();
 
     // Migration checks disabled. Schema is managed elsewhere.
-    /*
-    // Verify projects table status column
-    const [projectColumns] = await connection.query('SHOW COLUMNS FROM projects');
-    const existingProjectCols = projectColumns.map((col) => col.Field);
-
-    if (!existingProjectCols.includes('status')) {
-      await connection.query("ALTER TABLE projects ADD COLUMN `status` VARCHAR(20) DEFAULT 'Active'");
-      console.log("✨ Safely added missing projects column: status");
+    // However, we will ensure the users table exists for authentication
+    const [userColumns] = await connection.query('SHOW TABLES LIKE "users"');
+    if (userColumns.length === 0) {
+      console.log("✨ Creating missing 'users' table");
+      await connection.query(`
+        CREATE TABLE users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          username VARCHAR(255) NOT NULL UNIQUE,
+          password VARCHAR(255) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          role VARCHAR(50) NOT NULL,
+          status VARCHAR(20) DEFAULT 'Active',
+          created_at DATE NOT NULL
+        )
+      `);
+      
+      console.log("✨ Seeding default users into the database");
+      await connection.query(`
+        INSERT INTO users (username, password, name, email, role, status, created_at) VALUES 
+        ('super_admin', 'super_password_123', 'Director Robert Chen', 'robert.chen@apexconstruction.com', 'super_admin', 'Active', '2026-01-15'),
+        ('admin', 'admin_password_123', 'Sarah Jenkins', 'sarah.jenkins@apexconstruction.com', 'admin', 'Active', '2026-02-01'),
+        ('engineer', 'engineer_password_123', 'Engr. Marcus Vance', 'marcus.vance@apexconstruction.com', 'engineer', 'Active', '2026-03-10')
+      `);
     }
-
-    // Verify workers table address & phone_number columns
-    const [workerColumns] = await connection.query('SHOW COLUMNS FROM workers');
-    const existingWorkerCols = workerColumns.map((col) => col.Field);
-
-    if (!existingWorkerCols.includes('address')) {
-      await connection.query("ALTER TABLE workers ADD COLUMN `address` VARCHAR(500) DEFAULT NULL AFTER `profile_photo_url`");
-      console.log("✨ Safely added missing workers column: address");
-    }
-
-    if (!existingWorkerCols.includes('phone_number')) {
-      await connection.query("ALTER TABLE workers ADD COLUMN `phone_number` VARCHAR(50) DEFAULT NULL AFTER `address`");
-      console.log("✨ Safely added missing workers column: phone_number");
-    }
-
-    // Verify allocations table assigned_by column
-    const [allocationColumns] = await connection.query('SHOW COLUMNS FROM allocations');
-    const existingAllocationCols = allocationColumns.map((col) => col.Field);
-
-    if (!existingAllocationCols.includes('assigned_by')) {
-      await connection.query("ALTER TABLE allocations ADD COLUMN `assigned_by` VARCHAR(255) DEFAULT NULL");
-      console.log("✨ Safely added missing allocations column: assigned_by");
-    }
-    */
 
     console.log('✅ Database schema verified & updated successfully');
     connection.release();
