@@ -13,7 +13,7 @@ When your colleague says "Code is updated on GitHub," run this sequence:
 cd /var/www/drag_and_drop
 
 # 2. Pull the latest changes from GitHub
-git pull origin master
+git pull origin main
 
 # 3. Build and restart all Docker containers in the background
 # This automatically handles npm install and frontend building!
@@ -27,14 +27,14 @@ docker-compose ps
 
 ## 2. The Database Update
 
-Since the MySQL database is also containerized, raw SQL files can be imported by executing a command inside the container:
+Because your database is shared with other applications (like v2-attendance), **the MySQL database remains installed natively on your server** and is NOT containerized.
+
+If an update includes new database tables or columns, run the SQL import natively on the server just like before:
 
 ```bash
 # Import the SQL file (replace file.sql with the actual filename)
-cat /path/to/your/file.sql | docker exec -i worker_allocation_db mysql -u root -prootpassword worker_allocation_db
+mysql -u root -p worker_allocation_db < /path/to/your/file.sql
 ```
-
-*(Note: The default root password in docker-compose.yml is `rootpassword`. Update if you changed it).*
 
 ---
 
@@ -82,7 +82,7 @@ For experienced users, run all update steps in a single command:
 
 ```bash
 cd /var/www/drag_and_drop && \
-git pull origin master && \
+git pull origin main && \
 docker-compose up -d --build && \
 docker-compose ps
 ```
@@ -122,10 +122,9 @@ docker-compose ps
 |---------|---------------------|-------------------|----------------|
 | Backend API | 5000 | **5010** | worker_allocation_backend |
 | Frontend Web | 5173 | **3000** | worker_allocation_frontend |
-| MySQL DB | 3306 | **3306** | worker_allocation_db |
 | Redis Cache | 6379 | **6379** | worker_allocation_redis |
 
-*(Your Nginx reverse proxy routes traffic to host ports 5010 and 3000).*
+*(Your Nginx reverse proxy routes traffic to host ports 5010 and 3000. MySQL remains natively installed on port 3306).*
 
 ---
 
@@ -148,7 +147,7 @@ docker-compose up -d --build
 ## 10. Post-Deployment Verification Checklist
 
 After every deployment, verify:
-- [ ] `docker-compose ps` shows all containers (backend, frontend, mysql, redis) as "Up"
+- [ ] `docker-compose ps` shows all containers (backend, frontend, redis) as "Up"
 - [ ] `http://72.62.254.60:3000` loads properly
 - [ ] Site allocation dashboard displays successfully
 - [ ] The dashboard loads noticeably faster due to the new Redis cache
