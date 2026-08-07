@@ -16,6 +16,15 @@ services:
     networks:
       - app-network
 
+  # Redis Cache Container
+  redis:
+    image: redis:alpine
+    container_name: worker_allocation_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
   # Node.js Express Backend & Socket.io Server Container
   backend:
     build:
@@ -30,10 +39,12 @@ services:
       DB_PASSWORD: rootpassword
       DB_NAME: worker_allocation_db
       JWT_SECRET: super_secret_worker_allocation_key_2026
+      REDIS_URL: redis://redis:6379
     ports:
-      - "5000:5000"
+      - "5010:5000"
     depends_on:
       - mysql
+      - redis
     networks:
       - app-network
 
@@ -44,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: worker_allocation_frontend
     ports:
-      - "5173:5173"
+      - "3000:5173"
     depends_on:
       - backend
     networks:

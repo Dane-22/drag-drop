@@ -118,13 +118,22 @@ export const App: React.FC = () => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && error.response.status === 429) {
-          setToast({
-            id: String(Date.now()),
-            type: 'warning',
-            title: 'Rate Limit Reached (429)',
-            message: error.response.data?.message || 'Too many requests. Please wait 1 minute before trying again.'
-          });
+        if (error.response) {
+          if (error.response.status === 429) {
+            setToast({
+              id: String(Date.now()),
+              type: 'warning',
+              title: 'Rate Limit Reached (429)',
+              message: error.response.data?.message || 'Too many requests. Please wait 1 minute before trying again.'
+            });
+          } else if (error.response.status === 401 || error.response.status === 403) {
+            // Token is invalid or expired, log the user out
+            delete axios.defaults.headers.common['Authorization'];
+            localStorage.removeItem('apex_token');
+            localStorage.removeItem('apex_user');
+            setCurrentUser(null);
+            setActivePage('site_allocation');
+          }
         }
         return Promise.reject(error);
       }

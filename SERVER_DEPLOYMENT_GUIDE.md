@@ -1,6 +1,6 @@
-# Drag & Drop Site Allocation - Server Deployment Manual
+# Drag & Drop Site Allocation - Server Deployment Manual (Docker)
 
-Use this procedure to update the **Drag & Drop** application whenever new features or FIXes are pushed to the repository.
+Use this procedure to update the **Drag & Drop** application whenever new features or FIXes are pushed to the repository. The application is now fully containerized using Docker.
 
 ---
 
@@ -15,74 +15,49 @@ cd /var/www/drag_and_drop
 # 2. Pull the latest changes from GitHub
 git pull origin master
 
-# 3. Install any new dependencies
-npm install
-cd backend && npm install
-cd ../frontend && npm install
+# 3. Build and restart all Docker containers in the background
+# This automatically handles npm install and frontend building!
+docker-compose up -d --build
 
-# 4. Build the frontend (using your Server IP)
-# Replace 72.62.254.60 with your actual IP address if it changes
-cd ../frontend
-echo "VITE_API_BASE_URL=http://72.62.254.60:5010/api" > .env.local
-echo "VITE_WS_URL=http://72.62.254.60:5010" >> .env.local
-npm run build
-
-# 5. Restart PM2 services
-pm2 restart dragdrop-api --update-env
-pm2 restart dragdrop-web --update-env
-
-# 6. Verify services are running
-pm2 status
+# 4. Verify containers are running
+docker-compose ps
 ```
 
 ---
 
 ## 2. The Database Update
 
-If the update includes new database tables or columns:
+Since the MySQL database is also containerized, raw SQL files can be imported by executing a command inside the container:
 
-**SQL Import (since Drag&Drop uses raw MySQL queries):**
 ```bash
 # Import the SQL file (replace file.sql with the actual filename)
-mysql -u root -p worker_allocation_db < /path/to/your/file.sql
-
-# Verify: Check if new tables exist
-mysql -u root -p -e "USE worker_allocation_db; SHOW TABLES;"
+cat /path/to/your/file.sql | docker exec -i worker_allocation_db mysql -u root -prootpassword worker_allocation_db
 ```
+
+*(Note: The default root password in docker-compose.yml is `rootpassword`. Update if you changed it).*
 
 ---
 
 ## 3. Environment Persistence (.env)
 
-Your `.env` files are critical and are **NOT** tracked by Git (they are in `.gitignore`). They will remain intact during deployments.
+Your environment variables are injected into the containers. 
 
-**Backend .env location:**
-```bash
-/var/www/drag_and_drop/backend/.env
-```
-*(Ensure `PORT=5010`, `SERVICE_API_KEY`, and `V2_ATTENDANCE_API_URL` (e.g. `http://72.62.254.60:5002`) are set here!)*
+**Backend Configuration:**
+Edit the environment variables directly in `docker-compose.yml` under the `backend` service, or pass an `.env` file to Docker. By default, `docker-compose.yml` handles:
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `JWT_SECRET`
+- `REDIS_URL`
 
-**Frontend .env.local location:**
+**Frontend Configuration:**
+Before building, ensure the frontend environment variables point to your server IP.
 ```bash
-/var/www/drag_and_drop/frontend/.env.local
-```
-
-**V2 Attendance Backend .env location:**
-```bash
-/var/www/version2_attendance/backend/.env
-```
-*(Ensure `SITE_ALLOCATION_API_URL=http://localhost:5010` is set here so it can talk to the drag&drop backend!)*
-
-If you ever need to change environment variables, edit these files directly:
-```bash
-nano /var/www/drag_and_drop/backend/.env
 nano /var/www/drag_and_drop/frontend/.env.local
 ```
+*(Ensure `VITE_API_BASE_URL=http://72.62.254.60:5010/api` and `VITE_WS_URL=http://72.62.254.60:5010` are set here!)*
 
-**Important:** After changing `.env` files, restart the services:
+**Important:** After changing configuration files, recreate the containers:
 ```bash
-pm2 restart dragdrop-api --update-env
-pm2 restart dragdrop-web --update-env
+docker-compose up -d --build
 ```
 
 ---
@@ -91,55 +66,39 @@ pm2 restart dragdrop-web --update-env
 
 | Task | Command | Why? |
 |------|---------|------|
-| Check for API Errors | `pm2 logs dragdrop-api --lines 20` | To see why the backend is failing |
-| Check Nginx Errors | `sudo tail -f /var/log/nginx/error.log` | To debug 500/502 errors |
-| Test Nginx Config | `sudo nginx -t` | To ensure config is valid before reloading |
-| Check PM2 Status | `pm2 status` | To verify both services are running |
-| Monitor API Logs | `pm2 logs dragdrop-api` | Real-time backend monitoring |
-| Monitor Web Logs | `pm2 logs dragdrop-web` | Real-time frontend monitoring |
-| Check .env Files | `ls -la /var/www/drag_and_drop/backend/.env` | Confirm env files exist |
+| Check API/Backend Logs | `docker logs worker_allocation_backend --tail 50 -f` | To see backend/API errors |
+| Check Redis Cache Logs | `docker logs worker_allocation_redis -f` | To monitor cache activity |
+| Check Database Logs | `docker logs worker_allocation_db -f` | To monitor MySQL |
+| Restart All Services | `docker-compose restart` | Soft restart without rebuilding |
+| View Container Status | `docker-compose ps` | Ensure all services are running |
+| Check Nginx Errors | `sudo tail -f /var/log/nginx/error.log` | To debug 502 Bad Gateway errors |
 | Restart Nginx | `sudo systemctl reload nginx` | Apply Nginx config changes |
 
 ---
 
 ## 5. Summary "One-Liner"
 
-For experienced users, run all update steps in a single command (using server IP 72.62.254.60):
+For experienced users, run all update steps in a single command:
 
 ```bash
 cd /var/www/drag_and_drop && \
 git pull origin master && \
-npm install && \
-cd backend && npm install && \
-cd ../frontend && npm install && echo "VITE_API_BASE_URL=http://72.62.254.60:5010/api" > .env.local && echo "VITE_WS_URL=http://72.62.254.60:5010" >> .env.local && npm run build && \
-pm2 restart dragdrop-api --update-env && pm2 restart dragdrop-web --update-env && \
-pm2 status
+docker-compose up -d --build && \
+docker-compose ps
 ```
 
 ---
 
 ## 6. Troubleshooting Common Issues
 
-### Issue: "Port already in use" (EADDRINUSE)
-**FIX:** Because Docker heavily uses ports 5000 and 5001 on this server, ensure your backend `.env` is set to `PORT=5010`.
-```bash
-cat /var/www/drag_and_drop/backend/.env | grep PORT
-# Should output: PORT=5010
-```
+### Issue: "Port already in use"
+**FIX:** Because other services use ports 5000 and 5001 on this server, `docker-compose.yml` maps the backend to host port `5010`. If `5010` is used, change the left side of the port mapping in `docker-compose.yml` (e.g., `"5011:5000"`).
 
-### Issue: Integration with Attendance Failing (403 Forbidden)
-**FIX:** Ensure the `SERVICE_API_KEY` matches exactly between both backends:
-```bash
-cat /var/www/drag_and_drop/backend/.env | grep SERVICE_API_KEY
-cat /var/www/v2_attendance/backend/.env | grep SITE_ALLOCATION_API_KEY
-```
+### Issue: Integration with Attendance Failing
+**FIX:** Ensure the API keys match between systems. You can add `SERVICE_API_KEY=your_key` to the backend environment block in `docker-compose.yml`.
 
 ### Issue: Frontend shows "Route not found" or Network Errors
-**FIX:** Check that the frontend was built with the correct IP address and port:
-```bash
-cat /var/www/drag_and_drop/frontend/.env.local
-# Should show: VITE_API_BASE_URL=http://72.62.254.60:5010/api
-```
+**FIX:** Check that the frontend was built with the correct IP address in `frontend/.env.local` before you ran `docker-compose up -d --build`.
 
 ---
 
@@ -147,24 +106,26 @@ cat /var/www/drag_and_drop/frontend/.env.local
 
 ```
 /var/www/drag_and_drop/
-├── backend/           # Node.js API (port 5010)
-│   ├── .env          # Database, JWT & SERVICE_API_KEY config
-│   └── server.js     # Entry point
-├── frontend/          # Vite static export (port 3000)
-│   ├── .env.local    # API URL config
-│   └── dist/         # Static build files
+├── docker-compose.yml    # Master infrastructure configuration
+├── backend/              # Node.js API (Internal port 5000)
+│   ├── Dockerfile 
+│   └── server.js      
+├── frontend/             # Vite static export (Internal port 5173)
+│   └── Dockerfile    
 ```
 
 ---
 
 ## 8. Service Ports
 
-| Service | Port | Process Name |
-|---------|------|--------------|
-| Backend API | 5010 | dragdrop-api |
-| Frontend Web | 3000 | dragdrop-web |
-| Docker | 5000, 5001 | docker-proxy |
-| MySQL | 3306 | mysql |
+| Service | Internal Docker Port | Exposed Host Port | Container Name |
+|---------|---------------------|-------------------|----------------|
+| Backend API | 5000 | **5010** | worker_allocation_backend |
+| Frontend Web | 5173 | **3000** | worker_allocation_frontend |
+| MySQL DB | 3306 | **3306** | worker_allocation_db |
+| Redis Cache | 6379 | **6379** | worker_allocation_redis |
+
+*(Your Nginx reverse proxy routes traffic to host ports 5010 and 3000).*
 
 ---
 
@@ -178,9 +139,8 @@ cd /var/www/drag_and_drop
 git log --oneline -5
 # Revert to specific commit (replace abc123 with actual commit hash)
 git reset --hard abc123
-# Rebuild and restart
-cd frontend && npm run build
-pm2 restart all
+# Rebuild and restart the containers with the old code
+docker-compose up -d --build
 ```
 
 ---
@@ -188,11 +148,11 @@ pm2 restart all
 ## 10. Post-Deployment Verification Checklist
 
 After every deployment, verify:
-- [ ] `pm2 status` shows both services as "online"
+- [ ] `docker-compose ps` shows all containers (backend, frontend, mysql, redis) as "Up"
 - [ ] `http://72.62.254.60:3000` loads properly
 - [ ] Site allocation dashboard displays successfully
-- [ ] Integration: Clock-in from `v2-attendance` successfully validates against this API
-- [ ] No errors in `pm2 logs`
+- [ ] The dashboard loads noticeably faster due to the new Redis cache
+- [ ] No errors in `docker logs worker_allocation_backend`
 
 ---
 

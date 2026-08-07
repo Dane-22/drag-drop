@@ -10,6 +10,7 @@ import { authLimiter, mutationLimiter, globalLimiter } from './middleware/rateLi
 import { validate, allocateWorkerSchema, removeAllocationSchema, createProjectSchema, createWorkerSchema } from './middleware/validation.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getCache, setCache, clearCache } from './cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -190,6 +191,15 @@ app.post('/api/users/create', mutationLimiter, (req, res) => {
 // ----------------------------------------------------------------------
 app.get('/api/get_data', async (req, res) => {
   try {
+    const cachedData = await getCache('api_get_data');
+    if (cachedData) {
+      return res.json({
+        status: 'success',
+        message: 'Matrix allocation data retrieved from cache',
+        data: cachedData
+      });
+    }
+
     const [workers] = await pool.query(
       "SELECT id, CONCAT(first_name, ' ', last_name) AS name, position AS trade, 'Experienced' AS skill_level, IF(branch_code IS NOT NULL AND branch_code != '', 'Assigned', 'Available') AS status, '5 yrs Exp.' AS experience, profile_image AS profile_photo_url, NULL AS address, NULL AS phone_number, created_at FROM \`attendance-system\`.employees ORDER BY id ASC"
     );
@@ -228,10 +238,13 @@ app.get('/api/get_data', async (req, res) => {
       console.warn('Fallback query for allocations:', allocErr.message);
     }
 
+    const dataToCache = { workers, projects, allocations };
+    await setCache('api_get_data', dataToCache);
+
     res.json({
       status: 'success',
       message: 'Matrix allocation data retrieved successfully',
-      data: { workers, projects, allocations }
+      data: dataToCache
     });
   } catch (err) {
     console.error('Error fetching data:', err.message);
@@ -310,6 +323,8 @@ app.post('/api/allocations/sync_transfer', mutationLimiter, async (req, res) => 
     };
 
     io.emit('allocation_updated', { is_transfer: isTransfer, allocation: payload });
+
+    await clearCache('api_get_data');
 
     res.json({ success: true, message: 'Allocation synced successfully', data: payload });
   } catch (err) {
@@ -392,6 +407,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
 
       io.emit('allocation_updated', { is_transfer: isTransfer, allocation: payload });
       syncToAttendance();
+      await clearCache('api_get_data');
 
       return res.json({
         status: 'success',
@@ -429,6 +445,7 @@ app.post('/api/allocate_worker', mutationLimiter, validate(allocateWorkerSchema)
 
     io.emit('allocation_updated', { is_transfer: false, allocation: payload });
     syncToAttendance();
+    await clearCache('api_get_data');
 
     res.json({
       status: 'success',
@@ -474,6 +491,7 @@ app.post('/api/remove_allocation', mutationLimiter, validate(removeAllocationSch
     }
 
     io.emit('allocation_removed', { id, worker_id, project_id, day_of_week });
+    await clearCache('api_get_data');
 
     res.json({ status: 'success', message: 'Allocation removed successfully' });
   } catch (err) {
@@ -503,6 +521,7 @@ app.post('/api/create_project', mutationLimiter, validate(createProjectSchema), 
     };
 
     io.emit('site_created', newProject);
+    await clearCache('api_get_data');
 
     res.status(201).json({
       status: 'success',
@@ -531,6 +550,7 @@ app.post('/api/toggle_project_status', mutationLimiter, async (req, res) => {
 
     const payload = { id: Number(project_id), status: newStatus };
     io.emit('site_status_updated', payload);
+    await clearCache('api_get_data');
 
     res.json({
       status: 'success',
@@ -566,6 +586,7 @@ app.post('/api/update_project', mutationLimiter, async (req, res) => {
 
     const updatedProject = rows[0];
     io.emit('site_updated', updatedProject);
+    await clearCache('api_get_data');
 
     res.json({
       status: 'success',
